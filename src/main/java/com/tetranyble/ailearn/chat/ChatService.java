@@ -55,7 +55,7 @@ public class ChatService {
             ConversationTurn turn;
 
             try {
-                turn = messages.appendTurn(
+                turn = this.messages.appendTurn(
                         conversationId,
                         message,
                         reply,
@@ -63,7 +63,7 @@ public class ChatService {
                         replyToId
                 );
             } catch (RuntimeException persistenceFailure) {
-                memoryStore.deleteMessages(conversationId);
+                this.memoryStore.deleteMessages(conversationId);
                 throw persistenceFailure;
             }
 
@@ -73,8 +73,8 @@ public class ChatService {
                     MessageResponse.from(turn.assistantMessage())
             );
         } finally {
-            evictInProcessMemory(conversationId);
-            conversations.releaseProcessingLease(conversationId, leaseToken);
+            this.evictInProcessMemory(conversationId);
+            this.conversations.releaseProcessingLease(conversationId, leaseToken);
         }
     }
 
@@ -88,6 +88,6 @@ public class ChatService {
     }
 
     private void evictInProcessMemory(String conversationId) {
-        assistant.evictChatMemory(conversationId);
+        this.assistant.evictChatMemory(conversationId);
     }
 }
