@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -43,11 +44,22 @@ public class ConversationMessage {
     @JoinColumn(name = "reply_to_id", updatable = false)
     private ConversationMessage replyTo;
 
-    @Column(nullable = false, columnDefinition = "TEXT", updatable = false)
+    @Column(name = "run_id", length = 36, updatable = false)
+    private String runId;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 20)
+    private MessageStatus status;
+
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
 
     protected ConversationMessage() {
     }
@@ -60,6 +72,19 @@ public class ConversationMessage {
             String idempotencyKey,
             ConversationMessage replyTo
     ) {
+        this(conversation, sequence, role, content, idempotencyKey, replyTo, null, MessageStatus.COMPLETED);
+    }
+
+    public ConversationMessage(
+            Conversation conversation,
+            long sequence,
+            MessageRole role,
+            String content,
+            String idempotencyKey,
+            ConversationMessage replyTo,
+            String runId,
+            MessageStatus status
+    ) {
         this.id = UUID.randomUUID().toString();
         this.conversation = conversation;
         this.sequence = sequence;
@@ -67,11 +92,28 @@ public class ConversationMessage {
         this.content = content;
         this.idempotencyKey = idempotencyKey;
         this.replyTo = replyTo;
+        this.runId = runId;
+        this.status = status;
     }
 
     @PrePersist
     void beforeInsert() {
-        createdAt = Instant.now();
+        Instant now = Instant.now();
+        createdAt = now;
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    void beforeUpdate() {
+        updatedAt = Instant.now();
+    }
+
+    public void replaceContent(String content) {
+        this.content = content;
+    }
+
+    public void transitionTo(MessageStatus status) {
+        this.status = status;
     }
 
     public String getId() { return id; }
@@ -80,5 +122,8 @@ public class ConversationMessage {
     public MessageRole getRole() { return role; }
     public String getContent() { return content; }
     public String getReplyToId() { return replyTo == null ? null : replyTo.getId(); }
+    public String getRunId() { return runId; }
+    public MessageStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
 }

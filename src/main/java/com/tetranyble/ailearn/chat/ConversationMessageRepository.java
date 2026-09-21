@@ -55,6 +55,24 @@ public class ConversationMessageRepository {
         return messages;
     }
 
+    public List<ConversationMessage> findMemoryHistory(String conversationId, int limit) {
+        List<ConversationMessage> messages = new ArrayList<>(
+                entityManager.createQuery("""
+                                select message
+                                from ConversationMessage message
+                                where message.conversation.id = :conversationId
+                                  and message.status = :completed
+                                order by message.sequence desc
+                                """, ConversationMessage.class)
+                        .setParameter("conversationId", conversationId)
+                        .setParameter("completed", MessageStatus.COMPLETED)
+                        .setMaxResults(limit)
+                        .getResultList()
+        );
+        Collections.reverse(messages);
+        return messages;
+    }
+
     public Optional<ConversationTurn> findTurnByIdempotencyKey(
             String conversationId,
             String idempotencyKey

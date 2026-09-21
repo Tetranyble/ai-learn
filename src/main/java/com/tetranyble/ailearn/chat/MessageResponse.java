@@ -8,8 +8,32 @@ public record MessageResponse(
         String role,
         String content,
         String replyToId,
-        Instant createdAt
+        String runId,
+        String status,
+        Instant createdAt,
+        Instant updatedAt
 ) {
+    public MessageResponse(
+            String id,
+            long sequence,
+            String role,
+            String content,
+            String replyToId,
+            Instant createdAt
+    ) {
+        this(
+                id,
+                sequence,
+                role,
+                content,
+                replyToId,
+                null,
+                "completed",
+                createdAt,
+                createdAt
+        );
+    }
+
     public static MessageResponse from(ConversationMessage message) {
         return new MessageResponse(
                 message.getId(),
@@ -17,7 +41,10 @@ public record MessageResponse(
                 message.getRole().name().toLowerCase(),
                 message.getContent(),
                 message.getReplyToId(),
-                message.getCreatedAt()
+                message.getRunId(),
+                message.getStatus().name().toLowerCase(),
+                message.getCreatedAt(),
+                message.getUpdatedAt()
         );
     }
 }

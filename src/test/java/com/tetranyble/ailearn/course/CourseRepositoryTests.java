@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = "langchain4j.open-ai.chat-model.api-key=test-key")
+@SpringBootTest(properties = "langchain4j.open-ai.streaming-chat-model.api-key=test-key")
 @ActiveProfiles("test")
 @Transactional
 class CourseRepositoryTests {

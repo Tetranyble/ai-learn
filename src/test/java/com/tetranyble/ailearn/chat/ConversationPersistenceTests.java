@@ -14,7 +14,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(properties = "langchain4j.open-ai.chat-model.api-key=test-key")
+@SpringBootTest(properties = "app.chat.recovery-scan-interval=10m")
 @ActiveProfiles("test")
 class ConversationPersistenceTests {
 
@@ -26,6 +26,9 @@ class ConversationPersistenceTests {
 
     @Autowired
     private JpaChatMemoryStore memoryStore;
+
+    @Autowired
+    private ChatRunRepository runs;
 
     @Test
     void persistsTranscriptMemoryCursorAndProcessingLease() {
@@ -110,5 +113,86 @@ class ConversationPersistenceTests {
                 anotherConversation.getId(),
                 firstTurn.userMessage().getId()
         )).isInstanceOf(RequestValidationException.class);
+    }
+
+    @Test
+    void queuesInterruptsAndPersistsReloadableRunState() {
+        Conversation conversation = conversations.save(new Conversation(null));
+
+        EnqueuedChatRun first = runs.enqueue(
+                conversation.getId(),
+                "Draft an explanation.",
+                "run-request-1",
+                null,
+                ChatMode.QUEUE
+        );
+
+        assertThat(first.submission().run().status()).isEqualTo("queued");
+        assertThat(first.submission().userMessage().status()).isEqualTo("queued");
+        assertThat(first.submission().assistantMessage().content()).isEmpty();
+
+        ChatRunWork active = runs.claimNext(conversation.getId(), "worker-1")
+                .orElseThrow();
+
+        EnqueuedChatRun steering = runs.enqueue(
+                conversation.getId(),
+                "Use a practical example too.",
+                "run-request-2",
+                first.submission().assistantMessage().id(),
+                ChatMode.INTERRUPT
+        );
+
+        assertThat(steering.runToCancelId()).isEqualTo(active.runId());
+        assertThat(runs.cancellationReason(active.runId()))
+                .contains(ChatCancelReason.STEERED);
+
+        runs.updatePartial(active.runId(), "worker-1", "Partial answer");
+        runs.cancel(
+                active.runId(),
+                "worker-1",
+                "Partial answer",
+                ChatCancelReason.STEERED
+        );
+
+        ChatRunWork next = runs.claimNext(conversation.getId(), "worker-1")
+                .orElseThrow();
+        assertThat(next.runId()).isEqualTo(steering.submission().run().id());
+
+        assertThat(runs.findForConversation(conversation.getId(), 10))
+                .extracting(ChatRunResponse::status)
+                .containsExactly("interrupted", "processing");
+        assertThat(messages.findAfter(conversation.getId(), 0, 10))
+                .extracting(ConversationMessage::getStatus)
+                .containsExactly(
+                        MessageStatus.COMPLETED,
+                        MessageStatus.INTERRUPTED,
+                        MessageStatus.PROCESSING,
+                        MessageStatus.PROCESSING
+                );
+    }
+
+    @Test
+    void cancelsAQueuedRunBeforeGenerationStarts() {
+        Conversation conversation = conversations.save(new Conversation(null));
+        EnqueuedChatRun queued = runs.enqueue(
+                conversation.getId(),
+                "This should not reach the model.",
+                "cancel-before-start",
+                null,
+                ChatMode.QUEUE
+        );
+
+        ChatRunResponse cancelled = runs.requestCancellation(
+                        conversation.getId(),
+                        queued.submission().run().id(),
+                        ChatCancelReason.USER
+                )
+                .orElseThrow();
+
+        assertThat(cancelled.id()).isEqualTo(queued.submission().run().id());
+        assertThat(cancelled.status()).isEqualTo("cancelled");
+        assertThat(messages.findAfter(conversation.getId(), 0, 10))
+                .extracting(ConversationMessage::getStatus)
+                .containsExactly(MessageStatus.CANCELLED, MessageStatus.CANCELLED);
     }
 }

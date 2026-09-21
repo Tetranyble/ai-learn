@@ -12,6 +12,7 @@ import com.tetranyble.ailearn.validation.ConstraintViolationMapper;
 import com.tetranyble.ailearn.validation.RequestValidationExceptionMapper;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.server.validation.ValidationFeature;
+import org.glassfish.jersey.media.sse.SseFeature;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
@@ -19,6 +20,7 @@ public class JerseyConfig extends ResourceConfig {
 
     public JerseyConfig() {
         register(ValidationFeature.class);
+        register(SseFeature.class);
         register(ConstraintViolationMapper.class);
         register(RequestValidationExceptionMapper.class);
         register(ApiExceptionMapper.class);

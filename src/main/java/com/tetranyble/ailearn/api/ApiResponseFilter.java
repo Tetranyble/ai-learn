@@ -22,6 +22,12 @@ public class ApiResponseFilter implements ContainerResponseFilter {
             ContainerRequestContext requestContext,
             ContainerResponseContext responseContext
     ) {
+        MediaType responseType = responseContext.getMediaType();
+        if (responseType != null
+                && responseType.isCompatible(MediaType.SERVER_SENT_EVENTS_TYPE)) {
+            return;
+        }
+
         Object entity = responseContext.getEntity();
 
         if (entity instanceof ApiResponse<?>) {

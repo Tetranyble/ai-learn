@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "langchain4j.open-ai.chat-model.api-key=test-key"
+        properties = "langchain4j.open-ai.streaming-chat-model.api-key=test-key"
 )
 @ActiveProfiles("test")
 class ChatValidationIntegrationTests {

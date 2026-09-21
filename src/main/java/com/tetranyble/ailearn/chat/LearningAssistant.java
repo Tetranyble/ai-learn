@@ -3,6 +3,7 @@ package com.tetranyble.ailearn.chat;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.UserMessage;
+import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.memory.ChatMemoryAccess;
 import dev.langchain4j.service.spring.AiService;
 
@@ -15,7 +16,7 @@ public interface LearningAssistant extends ChatMemoryAccess {
             When you are uncertain, say so instead of inventing facts.
             Do not claim that you performed actions you cannot perform.
             """)
-    String chat(
+    TokenStream chat(
             @MemoryId String conversationId,
             @UserMessage String message
     );

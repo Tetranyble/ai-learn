@@ -24,7 +24,7 @@ import java.net.URI;
 import java.util.List;
 
 @Component
-@Path("/api/v1/conversations")
+@Path("/v1/conversations")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class ConversationResource {

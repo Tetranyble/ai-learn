@@ -15,7 +15,7 @@ import java.net.URI;
 import java.util.List;
 
 @Component
-@Path("/api/v1/courses")
+@Path("/v1/courses")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class CourseResource {

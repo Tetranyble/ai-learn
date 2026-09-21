@@ -40,7 +40,7 @@ public class JpaChatMemoryStore implements ChatMemoryStore {
             return ChatMessageDeserializer.messagesFromJson(snapshot.getMessagesJson());
         }
 
-        return messages.findLatest(conversationId, REBUILD_MESSAGE_LIMIT)
+        return messages.findMemoryHistory(conversationId, REBUILD_MESSAGE_LIMIT)
                 .stream()
                 .map(this::toLangChainMessage)
                 .toList();

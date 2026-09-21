@@ -1,93 +1,81 @@
 package com.tetranyble.ailearn.chat;
 
-import com.tetranyble.ailearn.exception.ChatProviderException;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ChatService {
 
-    private final LearningAssistant assistant;
     private final ConversationRepository conversations;
-    private final ConversationMessageRepository messages;
-    private final JpaChatMemoryStore memoryStore;
+    private final ChatRunRepository runs;
+    private final ChatRunCoordinator coordinator;
 
     public ChatService(
-            LearningAssistant assistant,
             ConversationRepository conversations,
-            ConversationMessageRepository messages,
-            JpaChatMemoryStore memoryStore
+            ChatRunRepository runs,
+            ChatRunCoordinator coordinator
     ) {
-        this.assistant = assistant;
         this.conversations = conversations;
-        this.messages = messages;
-        this.memoryStore = memoryStore;
+        this.runs = runs;
+        this.coordinator = coordinator;
     }
 
-    public ChatResponse startConversation(String message) {
+    public ChatSubmissionResponse startConversation(String message) {
         Conversation conversation = conversations.save(new Conversation(null));
-        return this.chat(conversation.getId(), message, null, null);
+        return submit(
+                conversation.getId(),
+                message,
+                null,
+                null,
+                ChatMode.QUEUE
+        );
     }
 
-    public ChatResponse chat(String conversationId, String message) {
-        return this.chat(conversationId, message, null, null);
+    public ChatSubmissionResponse submit(
+            String conversationId,
+            String message,
+            String idempotencyKey,
+            String replyToId,
+            ChatMode mode
+    ) {
+        EnqueuedChatRun enqueued = runs.enqueue(
+                conversationId,
+                message,
+                idempotencyKey,
+                replyToId,
+                mode
+        );
+        coordinator.accepted(enqueued);
+        return enqueued.submission();
     }
 
-    public ChatResponse chat(String conversationId, String message, String idempotencyKey, String replyToId) {
-        String leaseToken = this.conversations.acquireProcessingLease(conversationId);
-
-        try {
-            var existing = this.messages.findTurnByIdempotencyKey(
-                    conversationId,
-                    idempotencyKey
-            );
-
-            if (existing.isPresent()) {
-                return new ChatResponse(
+    public ChatCancellationResponse cancel(String conversationId) {
+        return coordinator.cancelActive(conversationId)
+                .map(run -> new ChatCancellationResponse(
                         conversationId,
-                        MessageResponse.from(existing.get().userMessage()),
-                        MessageResponse.from(existing.get().assistantMessage())
-                );
-            }
-
-            this.messages.validateReplyTarget(conversationId, replyToId);
-
-            String reply = this.requestAssistant(conversationId, message);
-            ConversationTurn turn;
-
-            try {
-                turn = this.messages.appendTurn(
+                        true,
+                        run
+                ))
+                .orElseGet(() -> new ChatCancellationResponse(
                         conversationId,
-                        message,
-                        reply,
-                        idempotencyKey,
-                        replyToId
-                );
-            } catch (RuntimeException persistenceFailure) {
-                this.memoryStore.deleteMessages(conversationId);
-                throw persistenceFailure;
-            }
-
-            return new ChatResponse(
-                    conversationId,
-                    MessageResponse.from(turn.userMessage()),
-                    MessageResponse.from(turn.assistantMessage())
-            );
-        } finally {
-            this.evictInProcessMemory(conversationId);
-            this.conversations.releaseProcessingLease(conversationId, leaseToken);
-        }
+                        false,
+                        null
+                ));
     }
 
-    private String requestAssistant(String conversationId, String message) {
-        try {
-            return this.assistant.chat(conversationId, message);
-        } catch (RuntimeException exception) {
-            this.memoryStore.deleteMessages(conversationId);
-            throw new ChatProviderException(exception);
-        }
-    }
-
-    private void evictInProcessMemory(String conversationId) {
-        this.assistant.evictChatMemory(conversationId);
+    public ChatCancellationResponse cancel(
+            String conversationId,
+            String runId
+    ) {
+        return coordinator.cancelRun(conversationId, runId)
+                .map(run -> new ChatCancellationResponse(
+                        conversationId,
+                        true,
+                        run
+                ))
+                .orElseGet(() -> new ChatCancellationResponse(
+                        conversationId,
+                        false,
+                        null
+                ));
     }
 }

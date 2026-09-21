@@ -13,9 +13,15 @@ public record ChatRequest(
                 regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
                 message = "replyToId must be a UUID"
         )
-        String replyToId
+        String replyToId,
+
+        ChatMode mode
 ) {
     public ChatRequest(String message) {
-        this(message, null);
+        this(message, null, ChatMode.QUEUE);
+    }
+
+    public ChatMode effectiveMode() {
+        return mode == null ? ChatMode.QUEUE : mode;
     }
 }
